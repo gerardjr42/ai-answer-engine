@@ -4,12 +4,14 @@
 // Refer to the Cheerio docs here on how to parse HTML: https://cheerio.js.org/docs/basics/loading
 // Refer to Puppeteer docs here: https://pptr.dev/guides/what-is-puppeteer
 
-export async function POST(req: Request) {
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  //testing
+  return NextResponse.json({ message: "Hello, World!" });
+}
+
+export async function POST(request: Request) {
   try {
-
-
-  } catch (error) {
-
-
-  }
+  } catch (error) {}
 }
