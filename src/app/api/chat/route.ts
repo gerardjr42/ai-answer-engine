@@ -1,4 +1,5 @@
 import FirecrawlApp from "@mendable/firecrawl-js";
+import { Redis } from "@upstash/redis";
 import { Groq } from "groq-sdk";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -10,7 +11,28 @@ const firecrawl = new FirecrawlApp({
   apiKey: process.env.FIRECRAWL_API_KEY,
 });
 
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
+
 async function scrapeAndCrawl(url: string) {
+  // Check cache first
+  const cacheKey = `scraped_content:${url}`;
+  const cachedContent = await redis.get<{
+    mainContent: {
+      markdown: string;
+      html: string;
+      metadata: Record<string, string>;
+    };
+  }>(cacheKey);
+
+  if (cachedContent) {
+    console.log("Cache hit for URL:", url);
+    return cachedContent;
+  }
+
+  console.log("Cache miss for URL:", url);
   const scrapeResult = await firecrawl.scrapeUrl(url, {
     formats: ["markdown", "html"],
   });
@@ -19,20 +41,18 @@ async function scrapeAndCrawl(url: string) {
     throw new Error(`Failed to scrape: ${scrapeResult.error}`);
   }
 
-  console.log("Scrape Result:", {
-    success: scrapeResult.success,
-    markdown: scrapeResult.markdown,
-    html: scrapeResult.html,
-    metadata: scrapeResult.metadata,
-  });
-
-  return {
+  const result = {
     mainContent: {
       markdown: scrapeResult.markdown,
       html: scrapeResult.html,
       metadata: scrapeResult.metadata,
     },
   };
+
+  // Cache the result for 24 hours
+  await redis.set(cacheKey, result, { ex: 86400 });
+
+  return result;
 }
 
 function extractLinks(markdown: string): Array<{ url: string }> {
@@ -101,7 +121,8 @@ function extractLinks(markdown: string): Array<{ url: string }> {
         !url.includes("/subscribe/") &&
         !url.includes("/membership/") &&
         !url.includes("/support/") &&
-        !url.includes("/newsletter/")
+        !url.includes("/newsletter/") &&
+        !url.includes("ratePlan")
       ) {
         links.push({ url });
       }
