@@ -5,6 +5,8 @@ import { useState } from "react";
 type Message = {
   role: "user" | "ai";
   content: string;
+  url?: string;
+  references?: string[];
 };
 
 export default function Home() {
@@ -13,12 +15,16 @@ export default function Home() {
     { role: "ai", content: "Hello! How can I help you today?" },
   ]);
   const [isLoading, setIsLoading] = useState(false);
+  const [url, setUrl] = useState("");
 
-  const handleSend = async () => {
+  const handleSend = async (url?: string) => {
     if (!message.trim()) return;
-
     // Add user message to the conversation
-    const userMessage = { role: "user" as const, content: message };
+    const userMessage = {
+      role: "user" as const,
+      content: url ? `Analyzing URL: ${url}\n\n${message}` : message,
+      url,
+    };
     setMessages(prev => [...prev, userMessage]);
     setMessage("");
     setIsLoading(true);
@@ -29,24 +35,37 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, url }),
       });
 
-      // TODO: Handle the response from the chat API to display the AI response in the UI
+      const data = await response.json();
 
-
-
-
+      if (response.ok) {
+        setMessages(prev => [
+          ...prev,
+          {
+            role: "ai",
+            content: data.message,
+            references: data.references,
+          },
+        ]);
+      } else {
+        throw new Error(data.error || "Something went wrong");
+      }
     } catch (error) {
       console.error("Error:", error);
+      setMessages(prev => [
+        ...prev,
+        {
+          role: "ai",
+          content: "Sorry, I encountered an error. Please try again later.",
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }
   };
 
-
-  // TODO: Modify the color schemes, fonts, and UI as needed for a good user experience
-  // Refer to the Tailwind CSS docs here: https://tailwindcss.com/docs/customizing-colors, and here: https://tailwindcss.com/docs/hover-focus-and-other-states
   return (
     <div className="flex flex-col h-screen bg-gray-900">
       {/* Header */}
@@ -75,7 +94,35 @@ export default function Home() {
                     : "bg-cyan-600 text-white ml-auto"
                 }`}
               >
-                {msg.content}
+                <div className="whitespace-pre-wrap">{msg.content}</div>
+                {msg.role === "ai" &&
+                  msg.references &&
+                  msg.references.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-gray-700 text-sm text-gray-400">
+                      <div className="font-semibold mb-1">References:</div>
+                      {msg.references.map((ref, i) => {
+                        const urlMatch = ref.match(/\[(.*?)\]\s*(.*)/);
+                        const number = urlMatch?.[1];
+                        const url = urlMatch?.[2];
+
+                        return (
+                          <div
+                            key={i}
+                            className="hover:text-cyan-400 transition-colors"
+                          >
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline"
+                            >
+                              {`[${number}] ${url}`}
+                            </a>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
               </div>
             </div>
           ))}
@@ -105,22 +152,31 @@ export default function Home() {
       {/* Input Area */}
       <div className="fixed bottom-0 w-full bg-gray-800 border-t border-gray-700 p-4">
         <div className="max-w-3xl mx-auto">
-          <div className="flex gap-3 items-center">
+          <div className="flex flex-col gap-3">
             <input
               type="text"
-              value={message}
-              onChange={e => setMessage(e.target.value)}
-              onKeyPress={e => e.key === "Enter" && handleSend()}
-              placeholder="Type your message..."
-              className="flex-1 rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-gray-400"
+              value={url}
+              onChange={e => setUrl(e.target.value)}
+              placeholder="Optional: Enter URL to analyze..."
+              className="rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-gray-400"
             />
-            <button
-              onClick={handleSend}
-              disabled={isLoading}
-              className="bg-cyan-600 text-white px-5 py-3 rounded-xl hover:bg-cyan-700 transition-all disabled:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? "Sending..." : "Send"}
-            </button>
+            <div className="flex gap-3 items-center">
+              <input
+                type="text"
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                onKeyPress={e => e.key === "Enter" && handleSend(url)}
+                placeholder="Type your message..."
+                className="flex-1 rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-gray-400"
+              />
+              <button
+                onClick={() => handleSend(url)}
+                disabled={isLoading}
+                className="bg-cyan-600 text-white px-5 py-3 rounded-xl hover:bg-cyan-700 transition-all disabled:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? "Sending..." : "Send"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
