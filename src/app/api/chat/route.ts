@@ -56,7 +56,7 @@ async function scrapeAndCrawl(url: string) {
 }
 
 function extractLinks(markdown: string): Array<{ url: string }> {
-  // Find the first heading (usually the title)
+  // Find the first heading
   const firstHeadingMatch = markdown.match(/^#+ .+$/m);
   if (!firstHeadingMatch) return [];
 
@@ -89,7 +89,9 @@ function extractLinks(markdown: string): Array<{ url: string }> {
     }
   }
 
+  // Extracts the main content from the markdown by slicing it between the start and end indices.
   const mainContent = markdown.slice(startIndex, endIndex);
+  // Defines a regular expression to match markdown links in the format [text](url).
   const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
   const links: Array<{ url: string }> = [];
   let match;
