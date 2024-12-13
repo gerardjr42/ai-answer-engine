@@ -1,16 +1,12 @@
-import FirecrawlApp from "@mendable/firecrawl-js";
 import { Redis } from "@upstash/redis";
 import * as cheerio from "cheerio";
 import { Groq } from "groq-sdk";
 import { NextRequest, NextResponse } from "next/server";
+import puppeteer from "puppeteer";
 import TurndownService from "turndown";
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
-});
-
-const firecrawl = new FirecrawlApp({
-  apiKey: process.env.FIRECRAWL_API_KEY,
 });
 
 const redis = new Redis({
@@ -36,38 +32,111 @@ async function scrapeAndCrawl(url: string) {
   }
 
   console.log("Cache miss for URL:", url);
-  const scrapeResult = await firecrawl.scrapeUrl(url, {
-    formats: ["html"], // Only request HTML format
+
+  // Launch browser
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
 
-  if (!scrapeResult.success) {
-    throw new Error(`Failed to scrape: ${scrapeResult.error}`);
-  }
+  try {
+    const page = await browser.newPage();
 
-  // Load HTML with Cheerio
-  const $ = cheerio.load(scrapeResult.html || "");
+    // Set timeout for navigation
+    await page.setDefaultNavigationTimeout(25000);
 
-  // Try to find main content in <main> or <article> tags
-  let contentHtml = $("main").html() || $("article").html();
+    // Wait until network is idle to ensure content is loaded
+    await page.goto(url, { waitUntil: "networkidle0" });
 
-  if (!contentHtml) {
-    // Fallback to body if no main/article found
-    contentHtml = $("body").html() || "";
-    console.log("No <main> or <article> tags found, using body content");
-  }
+    // Selectors to wait for
+    await Promise.race([
+      page.waitForSelector("main"),
+      page.waitForSelector("article"),
+      page.waitForSelector('[role="main"]'),
+      page.waitForSelector(".article-body"),
+      new Promise(resolve => setTimeout(resolve, 5000)),
+    ]);
 
-  // Extract links from the main content area
-  const links: Array<{ url: string }> = [];
-  $(contentHtml)
-    .find("a")
-    .each((_, element) => {
+    // Get full HTML after JavaScript execution
+    const html = await page.content();
+
+    const $ = cheerio.load(html);
+
+    const selectors = [
+      "main",
+      "article",
+      '[role="main"]',
+      ".article-body",
+      "#article-body",
+      ".story-body",
+      ".content-body",
+      ".article-content",
+      '[data-testid="article-body"]',
+      ".post-content",
+      ".entry-content",
+      "#content-body",
+    ];
+
+    let contentHtml = "";
+    for (const selector of selectors) {
+      const element = $(selector);
+      if (element.length) {
+        console.log(`Found content using selector: ${selector}`);
+        contentHtml = element.html() || "";
+        break;
+      }
+    }
+
+    if (!contentHtml) {
+      console.log(
+        "No content found with primary selectors, falling back to body"
+      );
+      contentHtml = $("body").html() || "";
+    }
+
+    const $content = cheerio.load(contentHtml);
+
+    const removeSelectors = [
+      "script",
+      "style",
+      "nav",
+      "header",
+      "footer",
+      '[role="complementary"]',
+      '[role="navigation"]',
+      '[role="banner"]',
+      ".ad",
+      ".advertisement",
+      ".social-share",
+      ".newsletter-signup",
+      ".related-articles",
+      ".sidebar",
+      "#sidebar",
+      ".comments",
+      ".comment-section",
+    ];
+
+    removeSelectors.forEach(selector => {
+      $content(selector).remove();
+    });
+
+    contentHtml = $content.html() || "";
+
+    // Verify we have meaningful content
+    if (contentHtml.length < 100) {
+      throw new Error("Could not extract meaningful content from the page");
+    }
+
+    // Extract links from the cleaned content
+    const links: Array<{ url: string }> = [];
+    $content("a").each((_, element) => {
       const href = $(element).attr("href");
       if (href && href.startsWith("http")) {
         try {
           new URL(href);
           const linkText = $(element).text().toLowerCase();
 
-          // Reuse existing link filtering logic
+          // Filter out unwanted links
           if (
             !linkText.includes("skip to") &&
             !linkText.includes("view image") &&
@@ -94,25 +163,28 @@ async function scrapeAndCrawl(url: string) {
             links.push({ url: href });
           }
         } catch {
-          // Invalid URL, skip
+          console.error("Invalid URL:", href);
         }
       }
     });
 
-  // Convert HTML to Markdown
-  const markdown = turndownService.turndown(contentHtml);
+    // Convert HTML to Markdown
+    const markdown = turndownService.turndown(contentHtml);
 
-  const result = {
-    mainContent: {
-      markdown,
-      links,
-    },
-  };
+    const result = {
+      mainContent: {
+        markdown,
+        links,
+      },
+    };
 
-  // Cache the result for 24 hours
-  await redis.set(cacheKey, result, { ex: 86400 });
+    // Cache for 24 hours
+    await redis.set(cacheKey, result, { ex: 86400 });
 
-  return result;
+    return result;
+  } finally {
+    await browser.close();
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -140,7 +212,7 @@ export async function POST(request: NextRequest) {
     const completion = await groq.chat.completions.create({
       model: "llama3-8b-8192",
       temperature: 0.5,
-      max_tokens: 2048,
+      max_tokens: 3500,
       messages: [
         {
           role: "system",
