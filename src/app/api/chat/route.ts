@@ -1,7 +1,9 @@
 import FirecrawlApp from "@mendable/firecrawl-js";
 import { Redis } from "@upstash/redis";
+import * as cheerio from "cheerio";
 import { Groq } from "groq-sdk";
 import { NextRequest, NextResponse } from "next/server";
+import TurndownService from "turndown";
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -16,14 +18,15 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN!,
 });
 
+const turndownService = new TurndownService();
+
 async function scrapeAndCrawl(url: string) {
   // Check cache first
   const cacheKey = `scraped_content:${url}`;
   const cachedContent = await redis.get<{
     mainContent: {
       markdown: string;
-      html: string;
-      metadata: Record<string, string>;
+      links: Array<{ url: string }>;
     };
   }>(cacheKey);
 
@@ -34,18 +37,75 @@ async function scrapeAndCrawl(url: string) {
 
   console.log("Cache miss for URL:", url);
   const scrapeResult = await firecrawl.scrapeUrl(url, {
-    formats: ["markdown", "html"],
+    formats: ["html"], // Only request HTML format
   });
 
   if (!scrapeResult.success) {
     throw new Error(`Failed to scrape: ${scrapeResult.error}`);
   }
 
+  // Load HTML with Cheerio
+  const $ = cheerio.load(scrapeResult.html || "");
+
+  // Try to find main content in <main> or <article> tags
+  let contentHtml = $("main").html() || $("article").html();
+
+  if (!contentHtml) {
+    // Fallback to body if no main/article found
+    contentHtml = $("body").html() || "";
+    console.log("No <main> or <article> tags found, using body content");
+  }
+
+  // Extract links from the main content area
+  const links: Array<{ url: string }> = [];
+  $(contentHtml)
+    .find("a")
+    .each((_, element) => {
+      const href = $(element).attr("href");
+      if (href && href.startsWith("http")) {
+        try {
+          new URL(href);
+          const linkText = $(element).text().toLowerCase();
+
+          // Reuse existing link filtering logic
+          if (
+            !linkText.includes("skip to") &&
+            !linkText.includes("view image") &&
+            !linkText.includes("reuse") &&
+            !linkText.includes("subscribe") &&
+            !linkText.includes("sign up") &&
+            !linkText.includes("rateplan") &&
+            !linkText.includes("follow us") &&
+            !linkText.includes("support us") &&
+            !linkText.includes("become a member") &&
+            !linkText.includes("newsletter") &&
+            !linkText.includes("subscription") &&
+            !linkText.includes("donate") &&
+            !href.match(/\.(jpg|jpeg|png|gif|webp|svg|ico)$/i) &&
+            !href.includes("/images/") &&
+            !href.includes("/img/") &&
+            !href.includes("/image/") &&
+            !href.includes("/subscribe/") &&
+            !href.includes("/membership/") &&
+            !href.includes("/support/") &&
+            !href.includes("/newsletter/") &&
+            !href.includes("ratePlan")
+          ) {
+            links.push({ url: href });
+          }
+        } catch {
+          // Invalid URL, skip
+        }
+      }
+    });
+
+  // Convert HTML to Markdown
+  const markdown = turndownService.turndown(contentHtml);
+
   const result = {
     mainContent: {
-      markdown: scrapeResult.markdown,
-      html: scrapeResult.html,
-      metadata: scrapeResult.metadata,
+      markdown,
+      links,
     },
   };
 
@@ -53,87 +113,6 @@ async function scrapeAndCrawl(url: string) {
   await redis.set(cacheKey, result, { ex: 86400 });
 
   return result;
-}
-
-function extractLinks(markdown: string): Array<{ url: string }> {
-  // Find the first heading
-  const firstHeadingMatch = markdown.match(/^#+ .+$/m);
-  if (!firstHeadingMatch) return [];
-
-  const startIndex = markdown.indexOf(firstHeadingMatch[0]);
-
-  // Common end markers that indicate the end of main content
-  const endMarkers = [
-    "## Most viewed",
-    "## Related",
-    "## Comments",
-    "Share this article",
-    "Share on social media",
-    "Follow us",
-    "Subscribe",
-    "Support us",
-    "Become a member",
-    "Sign up for our",
-    "Newsletter",
-    "Read more about",
-    "More from",
-    "More stories",
-    "You might also like",
-  ];
-
-  let endIndex = markdown.length;
-  for (const marker of endMarkers) {
-    const markerIndex = markdown.indexOf(marker);
-    if (markerIndex !== -1 && markerIndex < endIndex) {
-      endIndex = markerIndex;
-    }
-  }
-
-  // Extracts the main content from the markdown by slicing it between the start and end indices.
-  const mainContent = markdown.slice(startIndex, endIndex);
-  // Defines a regular expression to match markdown links in the format [text](url).
-  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-  const links: Array<{ url: string }> = [];
-  let match;
-
-  while ((match = linkRegex.exec(mainContent)) !== null) {
-    const text = match[1].trim();
-    const url = match[2].trim();
-
-    try {
-      new URL(url);
-      if (
-        !text.toLowerCase().includes("skip to") &&
-        !text.toLowerCase().includes("view image") &&
-        !text.toLowerCase().includes("reuse") &&
-        !text.toLowerCase().includes("subscribe") &&
-        !text.toLowerCase().includes("sign up") &&
-        !text.toLowerCase().includes("rateplan") &&
-        !text.toLowerCase().includes("follow us") &&
-        !text.toLowerCase().includes("support us") &&
-        !text.toLowerCase().includes("become a member") &&
-        !text.toLowerCase().includes("newsletter") &&
-        !text.toLowerCase().includes("subscription") &&
-        !text.toLowerCase().includes("donate") &&
-        url.startsWith("http") &&
-        !url.match(/\.(jpg|jpeg|png|gif|webp|svg|ico)$/i) &&
-        !url.includes("/images/") &&
-        !url.includes("/img/") &&
-        !url.includes("/image/") &&
-        !url.includes("/subscribe/") &&
-        !url.includes("/membership/") &&
-        !url.includes("/support/") &&
-        !url.includes("/newsletter/") &&
-        !url.includes("ratePlan")
-      ) {
-        links.push({ url });
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  return links;
 }
 
 export async function POST(request: NextRequest) {
@@ -144,14 +123,14 @@ export async function POST(request: NextRequest) {
 
     if (url) {
       const scrapedContent = await scrapeAndCrawl(url);
-      links = extractLinks(scrapedContent.mainContent.markdown || "");
+      links = scrapedContent.mainContent.links;
       const footnotes = links
         .map((link, index) => `[${index + 1}] ${link.url}`)
         .join("\n");
 
       context = `
         Main Content:
-        ${scrapedContent.mainContent.markdown || scrapedContent.mainContent.html}
+        ${scrapedContent.mainContent.markdown}
 
         References:
         ${footnotes}
