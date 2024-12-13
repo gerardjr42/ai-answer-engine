@@ -4,7 +4,7 @@ export function Header() {
   const { state } = useSidebar();
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex flex-col">
       <div className="p-2 border-b border-gray-700">
         {state === "collapsed" && (
           <SidebarTrigger className="md:inline-flex hidden absolute left-4" />
