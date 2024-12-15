@@ -128,6 +128,9 @@ async function scrapeAndCrawl(url: string) {
 
     // Modify the link extraction section
     $content("a").each((_, element) => {
+      // Stop if we already have 5 links
+      if (linkSet.size >= 5) return false;
+
       const href = $(element).attr("href");
       if (href && href.startsWith("http")) {
         try {
@@ -172,9 +175,7 @@ async function scrapeAndCrawl(url: string) {
     const result = {
       mainContent: {
         markdown,
-        links: Array.from(linkSet)
-          .slice(0, 5)
-          .map(url => ({ url })),
+        links: Array.from(linkSet).map(url => ({ url })),
       },
     };
 
