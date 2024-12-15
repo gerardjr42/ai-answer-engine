@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 
 const ratelimit = new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(10, "1 m"),
+  limiter: Ratelimit.slidingWindow(2, "1 m"),
   analytics: true,
 });
 
@@ -15,9 +15,18 @@ export async function middleware(request: NextRequest) {
   try {
     const { success, limit, reset, remaining } = await ratelimit.limit(ip);
 
+    // If rate limit is exceeded, return a JSON response with the error message and status code 429
     const response = success
       ? NextResponse.next()
-      : NextResponse.json({ error: "Too many requests" }, { status: 429 });
+      : NextResponse.json(
+          {
+            error: "Rate limit exceeded",
+            message:
+              "🤯 Whoa there, speedster! You've hit the brakes on our request highway. Take a quick pit stop for a minute, and then you can zoom back in! 🏎️💨",
+            reset,
+          },
+          { status: 429 }
+        );
 
     response.headers.set("X-RateLimit-Limit", limit.toString());
     response.headers.set("X-RateLimit-Remaining", remaining.toString());

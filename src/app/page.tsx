@@ -61,7 +61,20 @@ export default function Home() {
           },
         ]);
       } else {
-        throw new Error(data.error || "Something went wrong");
+        // If rate 429 (rate limit exceeded) show a message to the user
+        if (response.status === 429) {
+          setMessages(prev => [
+            ...prev,
+            {
+              role: "ai",
+              content:
+                data.message ||
+                "You've reached the maximum number of requests. Please wait a minute before trying again.",
+            },
+          ]);
+        } else {
+          throw new Error(data.error || "Something went wrong");
+        }
       }
     } catch (error) {
       console.error("Error:", error);
