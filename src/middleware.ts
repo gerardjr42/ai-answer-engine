@@ -1,6 +1,6 @@
 import redis from "@/app/utils/redis";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { Ratelimit } from "@upstash/ratelimit";
-import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 const ratelimit = new Ratelimit({
@@ -9,44 +9,54 @@ const ratelimit = new Ratelimit({
   analytics: true,
 });
 
-export async function middleware(request: NextRequest) {
-  // Retrieve the client's IP address for rate limiting purposes
-  const ip = request.headers.get("x-forwarded-for") ?? "127.0.0.1";
-  try {
-    const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+// Create a custom rate limit function
+async function rateLimit(req: Request) {
+  const ip = req.headers.get("x-forwarded-for") ?? "127.0.0.1";
+  const { success, limit, reset, remaining } = await ratelimit.limit(ip);
 
-    // If rate limit is exceeded, return a JSON response with the error message and status code 429
-    const response = success
-      ? NextResponse.next()
-      : NextResponse.json(
-          {
-            error: "Rate limit exceeded",
-            message:
-              "🤯 Whoa there, speedster! You've hit the brakes on our request highway. Take a quick pit stop for a minute, and then you can zoom back in! 🏎️💨",
-            reset,
-          },
-          { status: 429 }
-        );
-
-    response.headers.set("X-RateLimit-Limit", limit.toString());
-    response.headers.set("X-RateLimit-Remaining", remaining.toString());
-    response.headers.set("X-RateLimit-Reset", reset.toString());
-
-    return response;
-  } catch (error) {
+  if (!success) {
     return NextResponse.json(
-      { error: `Internal server error: ${error}` },
-      { status: 500 }
+      {
+        error: "Rate limit exceeded",
+        message:
+          "🤯 Whoa there, speedster! You've hit the brakes on our request highway. Take a quick pit stop for a minute, and then you can zoom back in! 🏎️💨",
+        reset,
+      },
+      {
+        status: 429,
+        headers: {
+          "X-RateLimit-Limit": limit.toString(),
+          "X-RateLimit-Remaining": remaining.toString(),
+          "X-RateLimit-Reset": reset.toString(),
+        },
+      }
     );
   }
+
+  return NextResponse.next();
 }
 
-// Configure which paths the middleware runs on
+// Define protected routes
+const isProtectedRoute = createRouteMatcher(["/", "/chat(.*)", "/api(.*)"]);
+
+export default clerkMiddleware(async (auth, req) => {
+  // Apply rate limiting first
+  const rateLimitResponse = await rateLimit(req);
+  if (rateLimitResponse.status === 429) {
+    return rateLimitResponse;
+  }
+
+  // Protect routes that require authentication
+  if (isProtectedRoute(req)) {
+    await auth.protect();
+  }
+});
+
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except static files and images
-     */
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    // Skip Next.js internals and all static files
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    // Always run for API routes
+    "/(api|trpc)(.*)",
   ],
 };

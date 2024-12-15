@@ -10,6 +10,7 @@
     "format:fix": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\""
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.9.2",
     "@mendable/firecrawl-js": "^1.9.2",
     "@radix-ui/react-dialog": "^1.1.3",
     "@radix-ui/react-separator": "^1.1.1",
