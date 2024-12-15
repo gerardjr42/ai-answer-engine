@@ -172,7 +172,9 @@ async function scrapeAndCrawl(url: string) {
     const result = {
       mainContent: {
         markdown,
-        links: Array.from(linkSet).map(url => ({ url })),
+        links: Array.from(linkSet)
+          .slice(0, 5)
+          .map(url => ({ url })),
       },
     };
 
