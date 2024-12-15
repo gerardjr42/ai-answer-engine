@@ -10,6 +10,11 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { PlusCircle, Search } from "lucide-react";
 import { useState } from "react";
 
@@ -99,15 +104,36 @@ export default function Home() {
             <SidebarHeader className=" border-gray-700 ">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <SidebarTrigger className="md:inline-flex group-[&[data-state=collapsed]]:hidden" />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <SidebarTrigger className="md:inline-flex group-[&[data-state=collapsed]]:hidden" />
+                    </TooltipTrigger>
+                    <TooltipContent>Toggle Sidebar</TooltipContent>
+                  </Tooltip>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button className="p-2 hover:bg-gray-700 rounded-md">
-                    <Search className="h-4 w-4 text-gray-400" />
-                  </button>
-                  <button className="p-2 hover:bg-gray-700 rounded-md">
-                    <PlusCircle className="h-4 w-4 text-gray-400" />
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button className="p-2 hover:bg-gray-700 rounded-md">
+                        <Search className="h-4 w-4 text-gray-400" />
+                        <span className="sr-only">Search</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Search</TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className="p-2 hover:bg-gray-700 rounded-md"
+                        title="New Chat"
+                      >
+                        <PlusCircle className="h-4 w-4 text-gray-400" />
+                        <span className="sr-only">New Chat</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>New Chat</TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
             </SidebarHeader>
