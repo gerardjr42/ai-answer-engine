@@ -43,7 +43,7 @@ async function scrapeAndCrawl(url: string) {
     const page = await browser.newPage();
 
     // Set timeout for navigation
-    await page.setDefaultNavigationTimeout(25000);
+    await page.setDefaultNavigationTimeout(40000);
 
     // Wait until network is idle to ensure content is loaded
     await page.goto(url, { waitUntil: "networkidle0" });
@@ -127,8 +127,10 @@ async function scrapeAndCrawl(url: string) {
       throw new Error("Could not extract meaningful content from the page");
     }
 
-    // Extract links from the cleaned content
-    const links: Array<{ url: string }> = [];
+    // Replace the links array with a Set
+    const linkSet = new Set<string>();
+
+    // Modify the link extraction section
     $content("a").each((_, element) => {
       const href = $(element).attr("href");
       if (href && href.startsWith("http")) {
@@ -160,7 +162,7 @@ async function scrapeAndCrawl(url: string) {
             !href.includes("/newsletter/") &&
             !href.includes("ratePlan")
           ) {
-            links.push({ url: href });
+            linkSet.add(href);
           }
         } catch {
           console.error("Invalid URL:", href);
@@ -174,7 +176,7 @@ async function scrapeAndCrawl(url: string) {
     const result = {
       mainContent: {
         markdown,
-        links,
+        links: Array.from(linkSet).map(url => ({ url })),
       },
     };
 
