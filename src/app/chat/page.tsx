@@ -15,8 +15,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useUser } from "@clerk/nextjs";
 import { PlusCircle, Search } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Message = {
   role: "user" | "ai";
@@ -26,12 +27,24 @@ type Message = {
 };
 
 export default function Home() {
+  const { user } = useUser();
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "ai", content: "Hello! How can I help you today?" },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [url, setUrl] = useState("");
+
+  useEffect(() => {
+    // Set initial greeting with user's username
+    if (user) {
+      setMessages([
+        {
+          role: "ai",
+          content: `Hello <span style="color: #0A91B3">@${user.username || "there"}</span>! 
+My name is Aether, how can I help you today?`,
+        },
+      ]);
+    }
+  }, [user]);
 
   const handleSend = async (url?: string) => {
     if (!message.trim()) return;
@@ -170,7 +183,12 @@ export default function Home() {
                             : "bg-cyan-600 text-white ml-auto"
                         }`}
                       >
-                        <div className="whitespace-pre-wrap">{msg.content}</div>
+                        <div
+                          className="whitespace-pre-wrap"
+                          dangerouslySetInnerHTML={{
+                            __html: msg.content,
+                          }}
+                        />
                         {msg.role === "ai" &&
                           msg.references &&
                           msg.references.length > 0 && (
