@@ -22,6 +22,7 @@
     "cheerio": "^1.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "framer-motion": "^11.15.0",
     "groq-sdk": "^0.9.0",
     "lucide-react": "^0.468.0",
     "next": "15.0.4",
@@ -34,7 +35,9 @@
     "turndown": "^7.2.0"
   },
   "devDependencies": {
+    "@types/json5": "^0.0.30",
     "@types/node": "^20",
+    "@types/puppeteer": "^5.4.7",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/turndown": "^5.0.5",

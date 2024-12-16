@@ -37,7 +37,7 @@ async function rateLimit(userId: string) {
   return NextResponse.next();
 }
 
-const isProtectedRoute = createRouteMatcher(["/", "/chat(.*)", "/api(.*)"]);
+const isProtectedRoute = createRouteMatcher(["/chat(.*)", "/api(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
   const { userId } = await auth();

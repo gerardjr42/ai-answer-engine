@@ -1,266 +1,166 @@
 "use client";
 
-import { Header } from "@/components/header";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { PlusCircle, Search } from "lucide-react";
-import { useState } from "react";
+import AuroraBackground from "@/components/AuroraBackground";
+import { Button } from "@/components/ui/button";
+import { useAuth, UserButton } from "@clerk/nextjs";
+import { motion } from "framer-motion";
+import Image from "next/image";
+import Link from "next/link";
 
-type Message = {
-  role: "user" | "ai";
-  content: string;
-  url?: string;
-  references?: string[];
-};
-
-export default function Home() {
-  const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "ai", content: "Hello! How can I help you today?" },
-  ]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [url, setUrl] = useState("");
-
-  const handleSend = async (url?: string) => {
-    if (!message.trim()) return;
-    // Add user message to the conversation
-    const userMessage = {
-      role: "user" as const,
-      content: url ? `Analyzing URL: ${url}\n\n${message}` : message,
-      url,
-    };
-    setMessages(prev => [...prev, userMessage]);
-    setMessage("");
-    setIsLoading(true);
-
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ message, url }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setMessages(prev => [
-          ...prev,
-          {
-            role: "ai",
-            content: data.message,
-            references: data.references,
-          },
-        ]);
-      } else {
-        // If rate 429 (rate limit exceeded) show a message to the user
-        if (response.status === 429) {
-          setMessages(prev => [
-            ...prev,
-            {
-              role: "ai",
-              content:
-                data.message ||
-                "You've reached the maximum number of requests. Please wait a minute before trying again.",
-            },
-          ]);
-        } else {
-          throw new Error(data.error || "Something went wrong");
-        }
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      setMessages(prev => [
-        ...prev,
-        {
-          role: "ai",
-          content: "Sorry, I encountered an error. Please try again later.",
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+export default function LandingPage() {
+  const { isSignedIn } = useAuth();
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900">
-      <SidebarProvider>
-        <div className="flex flex-1">
-          {/* Sidebar */}
-          <Sidebar className="w-64 border-r border-gray-700" variant="sidebar">
-            <SidebarHeader className=" border-gray-700 ">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <SidebarTrigger className="md:inline-flex group-[&[data-state=collapsed]]:hidden" />
-                    </TooltipTrigger>
-                    <TooltipContent>Toggle Sidebar</TooltipContent>
-                  </Tooltip>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button className="p-2 hover:bg-gray-700 rounded-md">
-                        <Search className="h-4 w-4 text-gray-400" />
-                        <span className="sr-only">Search</span>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>Search</TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        className="p-2 hover:bg-gray-700 rounded-md"
-                        title="New Chat"
-                      >
-                        <PlusCircle className="h-4 w-4 text-gray-400" />
-                        <span className="sr-only">New Chat</span>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>New Chat</TooltipContent>
-                  </Tooltip>
-                </div>
+    <div className="min-h-screen text-gray-100 overflow-hidden">
+      {/* Animated Background */}
+      <AuroraBackground />
+      <div className="relative z-10">
+        <motion.nav
+          initial={{ y: -100 }}
+          animate={{ y: 0 }}
+          transition={{ type: "spring", stiffness: 100 }}
+          className="fixed w-full z-50 border-b border-[#0A91B3]/20 bg-[#101827]/50 backdrop-blur-sm"
+        >
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center">
+                <Image
+                  src="/Images/dodecahedron.png"
+                  alt="AetherScribe"
+                  width={25}
+                  height={25}
+                  className="mr-2"
+                />
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                  className="text-xl font-bold text-[#0A91B3]"
+                >
+                  AetherScribe
+                </motion.span>
               </div>
-            </SidebarHeader>
-            <SidebarContent>
-              <SidebarGroup>
-                <SidebarGroupLabel className="text-white justify-center">
-                  Recent Chats
-                </SidebarGroupLabel>
-                {/* TODO: Add chat history items here */}
-              </SidebarGroup>
-            </SidebarContent>
-          </Sidebar>
-
-          {/* Main Content + Input Area Container */}
-          <div className="flex-1 flex flex-col relative">
-            {/* Messages Container */}
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <Header />
-              <div className="flex-1 overflow-y-auto pb-32 pt-4">
-                <div className="max-w-3xl mx-auto px-4">
-                  {messages.map((msg, index) => (
-                    <div
-                      key={index}
-                      className={`flex gap-4 mb-4 ${
-                        msg.role === "ai"
-                          ? "justify-start"
-                          : "justify-end flex-row-reverse"
-                      }`}
-                    >
-                      <div
-                        className={`px-4 py-2 rounded-2xl max-w-[80%] ${
-                          msg.role === "ai"
-                            ? "bg-gray-800 border border-gray-700 text-gray-100"
-                            : "bg-cyan-600 text-white ml-auto"
-                        }`}
-                      >
-                        <div className="whitespace-pre-wrap">{msg.content}</div>
-                        {msg.role === "ai" &&
-                          msg.references &&
-                          msg.references.length > 0 && (
-                            <div className="mt-2 pt-2 border-t border-gray-700 text-sm text-gray-400">
-                              <div className="font-semibold mb-1">
-                                References:
-                              </div>
-                              {msg.references.map((ref, i) => {
-                                const urlMatch = ref.match(/\[(.*?)\]\s*(.*)/);
-                                const number = urlMatch?.[1];
-                                const url = urlMatch?.[2];
-                                return (
-                                  <div
-                                    key={i}
-                                    className="hover:text-cyan-400 transition-colors"
-                                  >
-                                    <a
-                                      href={url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="hover:underline"
-                                    >
-                                      {`[${number}] ${url}`}
-                                    </a>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                      </div>
-                    </div>
-                  ))}
-                  {isLoading && (
-                    <div className="flex gap-4 mb-4">
-                      <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center">
-                        <svg
-                          className="w-5 h-5 text-gray-400"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                        >
-                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-4-8c.79 0 1.5-.71 1.5-1.5S8.79 9 8 9s-1.5.71-1.5 1.5S7.21 11 8 11zm8 0c.79 0 1.5-.71 1.5-1.5S16.79 9 16 9s-1.5.71-1.5 1.5.71 1.5 1.5 1.5zm-4 4c2.21 0 4-1.79 4-4h-8c0 2.21 1.79 4 4 4z" />
-                        </svg>
-                      </div>
-                      <div className="px-4 py-2 rounded-2xl bg-gray-800 border border-gray-700 text-gray-100">
-                        <div className="flex items-center gap-1">
-                          <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                          <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                          <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Input Area */}
-            <div className="absolute bottom-0 left-0 right-0 border-t border-gray-700 bg-gray-900 py-4">
-              <div className="max-w-3xl mx-auto px-4">
-                <div className="flex flex-col gap-3">
-                  <input
-                    type="text"
-                    value={url}
-                    onChange={e => setUrl(e.target.value)}
-                    placeholder="Optional: Enter URL to analyze..."
-                    className="rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-gray-400"
-                  />
-                  <div className="flex gap-3 items-center">
-                    <input
-                      type="text"
-                      value={message}
-                      onChange={e => setMessage(e.target.value)}
-                      onKeyPress={e => e.key === "Enter" && handleSend(url)}
-                      placeholder="Type your message..."
-                      className="flex-1 rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-gray-400"
-                    />
-                    <button
-                      onClick={() => handleSend(url)}
-                      disabled={isLoading}
-                      className="bg-cyan-600 text-white px-5 py-3 rounded-xl hover:bg-cyan-700 transition-all disabled:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isLoading ? "Sending..." : "Send"}
-                    </button>
-                  </div>
-                </div>
+              <div>
+                {isSignedIn ? (
+                  <UserButton afterSignOutUrl="/" />
+                ) : (
+                  <Link href="/sign-in">
+                    <Button className="bg-[#0A91B3] text-white hover:bg-[#0A91B3]/80">
+                      Login
+                    </Button>
+                  </Link>
+                )}
               </div>
             </div>
           </div>
+        </motion.nav>
+
+        <div className="relative">
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-16">
+            <div className="text-center space-y-10">
+              <motion.h1
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8 }}
+                className="text-5xl md:text-7xl font-bold tracking-tight"
+              >
+                Unveil the Web with
+                <br />
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.8, duration: 0.8 }}
+                  className="text-[#0A91B3]"
+                >
+                  AetherScribe
+                </motion.span>
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4, duration: 0.8 }}
+                className="max-w-2xl mx-auto text-xl md:text-2xl text-gray-300"
+              >
+                Harness the power of AI to extract, analyze, and interpret web
+                content. AetherScribe brings intelligent web scraping to your
+                fingertips.
+              </motion.p>
+            </div>
+          </div>
+          <div className="mt-12 grid md:grid-cols-3 gap-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            {[
+              {
+                title: "Ethereal Extraction",
+                description:
+                  "Advanced AI algorithms delve deep into web content, bringing forth precise and relevant information",
+              },
+              {
+                title: "Instant Insights",
+                description:
+                  "Transform raw web data into actionable insights with real-time analysis and summaries",
+              },
+              {
+                title: "Intuitive Interaction",
+                description:
+                  "Engage in natural conversations with AI to sculpt your web scraping experience",
+              },
+            ].map((feature, index) => (
+              <motion.div
+                key={feature.title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 * index, duration: 0.5 }}
+                className="p-5 rounded-2xl bg-[#101827]/50 backdrop-blur-sm border border-[#0A91B3]/20"
+              >
+                <h3 className="text-lg font-semibold mb-2 text-[#0A91B3]">
+                  {feature.title}
+                </h3>
+                <p className="text-sm text-gray-300">{feature.description}</p>
+              </motion.div>
+            ))}
+          </div>
         </div>
-      </SidebarProvider>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1, duration: 1 }}
+          className="relative bg-[#101827]/50 backdrop-blur-sm py-12 mt-12"
+        >
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center">
+              <motion.h2
+                initial={{ y: 20 }}
+                animate={{ y: 0 }}
+                transition={{ delay: 1.2, duration: 0.5 }}
+                className="text-2xl font-extrabold text-white sm:text-3xl"
+              >
+                Ready to transcend web scraping?
+              </motion.h2>
+              <motion.p
+                initial={{ y: 20 }}
+                animate={{ y: 0 }}
+                transition={{ delay: 1.4, duration: 0.5 }}
+                className="mt-3 text-lg text-gray-300"
+              >
+                Join AetherScribe today and elevate your web data extraction
+                experience.
+              </motion.p>
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 1.6, duration: 0.5 }}
+                className="mt-6 flex justify-center"
+              >
+                <Link href="/sign-up">
+                  <Button className="text-lg px-8 py-3 bg-[#0A91B3] hover:bg-[#0A91B3]/80">
+                    Begin Your Journey
+                  </Button>
+                </Link>
+              </motion.div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 }
