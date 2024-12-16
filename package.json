@@ -22,9 +22,11 @@
     "cheerio": "^1.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dompurify": "^3.2.3",
     "framer-motion": "^11.15.0",
     "groq-sdk": "^0.9.0",
     "lucide-react": "^0.468.0",
+    "marked": "^15.0.4",
     "next": "15.0.4",
     "prettier": "^3.4.2",
     "puppeteer": "^23.10.4",
@@ -35,6 +37,7 @@
     "turndown": "^7.2.0"
   },
   "devDependencies": {
+    "@tailwindcss/typography": "^0.5.15",
     "@types/json5": "^0.0.30",
     "@types/node": "^20",
     "@types/puppeteer": "^5.4.7",

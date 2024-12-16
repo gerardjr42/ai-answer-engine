@@ -16,7 +16,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useUser } from "@clerk/nextjs";
+import DOMPurify from "dompurify";
 import { PlusCircle, Search } from "lucide-react";
+import { marked } from "marked";
 import { useEffect, useState } from "react";
 
 type Message = {
@@ -39,8 +41,7 @@ export default function Home() {
       setMessages([
         {
           role: "ai",
-          content: `Hello <span style="color: #0A91B3">@${user.username || "there"}</span>! 
-My name is Aether, how can I help you today?`,
+          content: `Hello **@${user.username || "there"}**! \nMy name is Aether, how can I help you today?`,
         },
       ]);
     }
@@ -106,6 +107,15 @@ My name is Aether, how can I help you today?`,
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const renderMarkdown = (content: string) => {
+    marked.setOptions({
+      gfm: true,
+      breaks: true,
+    });
+
+    return DOMPurify.sanitize(marked.parse(content, { async: false }));
   };
 
   return (
@@ -184,9 +194,19 @@ My name is Aether, how can I help you today?`,
                         }`}
                       >
                         <div
-                          className="whitespace-pre-wrap"
+                          className="prose prose-invert max-w-none 
+                              prose-p:my-4
+                              prose-headings:my-6
+                              prose-ul:my-4 
+                              prose-ul:list-disc 
+                              prose-ol:my-4 
+                              prose-ol:list-decimal 
+                              prose-li:my-2
+                            prose-strong:text-[#2DAC9E]
+                            [&>*:first-child]:mt-0 
+                            [&>*:last-child]:mb-0"
                           dangerouslySetInnerHTML={{
-                            __html: msg.content,
+                            __html: renderMarkdown(msg.content),
                           }}
                         />
                         {msg.role === "ai" &&
