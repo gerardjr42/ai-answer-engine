@@ -12,26 +12,13 @@ export async function POST(request: NextRequest) {
       try {
         const scrapedContent = await scrapeAndCrawl(url);
         links = scrapedContent.mainContent.links;
-        const footnotes = links
-          .map((link, index) => `[${index + 1}] ${link.url}`)
-          .join("\n");
 
         context = `
           Main Content:
           ${scrapedContent.mainContent.markdown}
-
-          References:
-          ${footnotes}
         `;
       } catch (error) {
         console.error("Error scraping content:", error);
-        return NextResponse.json(
-          {
-            error:
-              "Failed to scrape the provided URL. Please check the URL and try again.",
-          },
-          { status: 422 }
-        );
       }
     }
 

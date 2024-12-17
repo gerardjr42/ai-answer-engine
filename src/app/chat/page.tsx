@@ -151,7 +151,47 @@ export default function Home() {
       .use(rehypeStringify)
       .process(content);
 
-    return DOMPurify.sanitize(String(file));
+    // Sanitize the HTML
+    const sanitizedContent = DOMPurify.sanitize(String(file), {
+      ADD_ATTR: ["target", "rel", "style", "data-line", "data-language"],
+      ALLOWED_ATTR: ["href", "class", "target", "rel", "style", "data-*"],
+      ALLOWED_TAGS: [
+        "a",
+        "p",
+        "br",
+        "ul",
+        "ol",
+        "li",
+        "b",
+        "i",
+        "strong",
+        "em",
+        "strike",
+        "code",
+        "pre",
+        "blockquote",
+        "div",
+        "span",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+      ],
+    });
+
+    // Create a temporary container
+    const container = document.createElement("div");
+    container.innerHTML = sanitizedContent;
+
+    // Process all links
+    container.querySelectorAll("a").forEach(link => {
+      link.setAttribute("target", "_blank");
+      link.setAttribute("rel", "noopener noreferrer");
+    });
+
+    return container.innerHTML;
   };
 
   return (
@@ -223,7 +263,7 @@ export default function Home() {
                       }`}
                     >
                       <div
-                        className={`px-4 py-2 rounded-2xl max-w-[80%] ${
+                        className={`px-4 py-2 rounded-2xl max-w-[100%] ${
                           msg.role === "ai"
                             ? "bg-gray-800 border border-gray-700 text-gray-100"
                             : "bg-cyan-600 text-white ml-auto"
@@ -240,6 +280,11 @@ export default function Home() {
                               prose-ol:list-decimal 
                               prose-li:my-2
                             prose-strong:text-[#CBA6F7]
+                            prose-a:text-cyan-400
+                              prose-a:underline
+                              prose-a:underline-offset-2
+                            prose-a:decoration-cyan-400/50
+                            prose-a:hover:decoration-cyan-400
                             [&>*:first-child]:mt-0 
                             [&>*:last-child]:mb-0"
                           dangerouslySetInnerHTML={{

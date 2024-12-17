@@ -13,7 +13,11 @@ export async function getGroqResponse(message: string, context?: string) {
       {
         role: "system",
         content:
-          "You are a helpful AI assistant that answers questions based on the provided context. When referencing information, use footnote numbers [1] to cite sources. The footnotes are provided at the end of the context. If no context is provided, you'll answer based on your general knowledge.",
+          "You are an expert web scraper and information analyst. When analyzing content:\n" +
+          "- For normal content, provide insightful answers based on the available context\n" +
+          "- Use inline citations [1] for sources, but do not include a References section\n" +
+          "- Keep responses concise and relevant\n" +
+          "- If there's no context at all, respond based on your general knowledge about the topic. If no main context, inform the user that the website is protected from scraping and to adhere to responsible scraping guidelines. Explain how websites can protect their content from scraping and ethical guidelines. End with giving the user a change to try again with a different URL.",
       },
       {
         role: "user",

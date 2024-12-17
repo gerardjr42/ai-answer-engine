@@ -60,6 +60,7 @@ export async function scrapeAndCrawl(url: string) {
     const selectors = [
       "main",
       "article",
+      "section",
       '[role="main"]',
       ".article-body",
       "#article-body",
