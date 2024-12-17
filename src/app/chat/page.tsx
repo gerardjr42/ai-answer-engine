@@ -18,8 +18,13 @@ import {
 import { useUser } from "@clerk/nextjs";
 import DOMPurify from "dompurify";
 import { PlusCircle, Search } from "lucide-react";
-import { marked } from "marked";
 import { useEffect, useState } from "react";
+import type { Options } from "rehype-pretty-code";
+import rehypePrettyCode from "rehype-pretty-code";
+import rehypeStringify from "rehype-stringify";
+import remarkParse from "remark-parse";
+import remarkRehype from "remark-rehype";
+import { unified } from "unified";
 
 type Message = {
   role: "user" | "ai";
@@ -34,6 +39,16 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [url, setUrl] = useState("");
+  const [renderedMessages, setRenderedMessages] = useState<{
+    [key: number]: string;
+  }>({});
+
+  useEffect(() => {
+    messages.forEach(async (msg, index) => {
+      const rendered = await renderMarkdown(msg.content);
+      setRenderedMessages(prev => ({ ...prev, [index]: rendered }));
+    });
+  }, [messages]);
 
   useEffect(() => {
     // Set initial greeting with user's username
@@ -109,13 +124,34 @@ export default function Home() {
     }
   };
 
-  const renderMarkdown = (content: string) => {
-    marked.setOptions({
-      gfm: true,
-      breaks: true,
-    });
+  const renderMarkdown = async (content: string) => {
+    const options: Options = {
+      theme: "catppuccin-mocha",
+      keepBackground: true,
 
-    return DOMPurify.sanitize(marked.parse(content, { async: false }));
+      onVisitLine(node) {
+        if (node.children.length === 0) {
+          node.children = [{ type: "text", value: " " }];
+        }
+      },
+      onVisitHighlightedLine(node) {
+        node.properties.className = node.properties.className || [];
+        node.properties.className.push("highlighted");
+      },
+      onVisitHighlightedChars(node) {
+        node.properties.className = ["word"];
+      },
+      grid: true,
+    };
+
+    const file = await unified()
+      .use(remarkParse)
+      .use(remarkRehype)
+      .use(rehypePrettyCode, options)
+      .use(rehypeStringify)
+      .process(content);
+
+    return DOMPurify.sanitize(String(file));
   };
 
   return (
@@ -176,7 +212,7 @@ export default function Home() {
             <div className="flex-1 flex flex-col overflow-hidden">
               <Header />
               <div className="flex-1 overflow-y-auto pb-32 pt-4">
-                <div className="max-w-3xl mx-auto px-4">
+                <div className="max-w-4xl mx-auto px-4 ">
                   {messages.map((msg, index) => (
                     <div
                       key={index}
@@ -196,17 +232,18 @@ export default function Home() {
                         <div
                           className="prose prose-invert max-w-none 
                               prose-p:my-4
-                              prose-headings:my-6
+                              prose-headings:text-base
+                              prose-headings:italic
                               prose-ul:my-4 
                               prose-ul:list-disc 
                               prose-ol:my-4 
                               prose-ol:list-decimal 
                               prose-li:my-2
-                            prose-strong:text-[#2DAC9E]
+                            prose-strong:text-[#CBA6F7]
                             [&>*:first-child]:mt-0 
                             [&>*:last-child]:mb-0"
                           dangerouslySetInnerHTML={{
-                            __html: renderMarkdown(msg.content),
+                            __html: renderedMessages[index] || "",
                           }}
                         />
                         {msg.role === "ai" &&
@@ -267,14 +304,14 @@ export default function Home() {
 
             {/* Input Area */}
             <div className="absolute bottom-0 left-0 right-0 border-t border-gray-700 bg-gray-900 py-4">
-              <div className="max-w-3xl mx-auto px-4">
+              <div className="max-w-4xl mx-auto px-4">
                 <div className="flex flex-col gap-3">
                   <input
                     type="text"
                     value={url}
                     onChange={e => setUrl(e.target.value)}
                     placeholder="Optional: Enter URL to analyze..."
-                    className="rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-gray-400"
+                    className="rounded-lg border border-gray-700 bg-gray-900 px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-gray-400"
                   />
                   <div className="flex gap-3 items-center">
                     <input
@@ -283,12 +320,12 @@ export default function Home() {
                       onChange={e => setMessage(e.target.value)}
                       onKeyPress={e => e.key === "Enter" && handleSend(url)}
                       placeholder="Type your message..."
-                      className="flex-1 rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-gray-400"
+                      className="flex-1 rounded-lg border border-gray-700 bg-gray-900 px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-gray-400"
                     />
                     <button
                       onClick={() => handleSend(url)}
                       disabled={isLoading}
-                      className="bg-cyan-600 text-white px-5 py-3 rounded-xl hover:bg-cyan-700 transition-all disabled:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-cyan-600 text-white px-4 py-2 rounded-xl hover:bg-cyan-700 transition-all disabled:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isLoading ? "Sending..." : "Send"}
                     </button>
